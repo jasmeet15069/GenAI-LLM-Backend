@@ -23,9 +23,14 @@ if not GROQ_API_KEY:
 # ================= APP =================
 app = Flask(__name__, static_folder="static")
 
-# IMPORTANT: eventlet REMOVED
-# socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
-socketio = SocketIO(app, cors_allowed_origins="*")
+# Python 3.13 SAFE MODE: threading + polling (NO eventlet, NO websockets)
+socketio = SocketIO(
+    app,
+    cors_allowed_origins="*",
+    async_mode="threading",
+    ping_timeout=120,
+    ping_interval=25
+)
 
 llm = Groq(api_key=GROQ_API_KEY)
 
@@ -259,4 +264,3 @@ def socket_memory():
 # ================= LOCAL RUN =================
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=5000, debug=True)
-# 1.1
