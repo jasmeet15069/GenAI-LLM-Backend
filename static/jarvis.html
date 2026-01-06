@@ -59,7 +59,6 @@ body{
   border:1px solid rgba(0,188,212,.35);
 }
 
-/* === MEMORY CONFIRMATION === */
 .memory{
   align-self:center;
   background:rgba(0,188,212,.12);
@@ -86,8 +85,6 @@ body{
   border:1px solid var(--border);
   outline:none;
 }
-
-/* ===== MIC + ORB ===== */
 
 .mic-wrap{
   position:relative;
@@ -178,7 +175,13 @@ const input=document.getElementById("input");
 const micBtn=document.getElementById("micBtn");
 const micOrb=document.getElementById("micOrb");
 const speakerBtn=document.getElementById("speakerBtn");
-const socket=io();
+
+/* FORCE POLLING ONLY (NO WEBSOCKETS) */
+const socket=io({
+  transports:["polling"],
+  upgrade:false,
+  timeout:20000
+});
 
 /* ===== CHAT ===== */
 function add(text, cls){

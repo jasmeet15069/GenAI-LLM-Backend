@@ -28,9 +28,9 @@ socketio = SocketIO(
     app,
     cors_allowed_origins="*",
     async_mode="threading",
-    transports=["polling"],   # disables websocket entirely
-    ping_timeout=120,
-    ping_interval=25
+    transports=["polling"],
+    ping_timeout=20,
+    ping_interval=10
 )
 
 llm = Groq(api_key=GROQ_API_KEY)
