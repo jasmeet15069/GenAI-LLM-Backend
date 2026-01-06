@@ -4,7 +4,7 @@ services:
     env: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app -w 1 --threads 4
+    startCommand: gunicorn app:app --worker-class eventlet -w 1 # gunicorn app:app -w 1 --threads 4
     envVars:
       - key: GROQ_API_KEY
         sync: false
