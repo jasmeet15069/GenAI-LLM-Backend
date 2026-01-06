@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>JARVIS</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+
+<style>
+:root{
+  --panel:#ffffff;
+  --border:#cfe6ef;
+  --cyan:#00bcd4;
+  --text:#0e1e26;
+  --muted:#6b8a96;
+}
+*{box-sizing:border-box;font-family:Segoe UI,system-ui}
+
+body{
+  margin:0;height:100vh;
+  display:flex;justify-content:center;align-items:center;
+  background:radial-gradient(circle,#f8fdff,#e6f2f7);
+}
+
+.frame{
+  width:92%;max-width:980px;height:86vh;
+  background:var(--panel);
+  border-radius:18px;
+  border:1px solid var(--border);
+  display:flex;flex-direction:column;
+  box-shadow:0 30px 80px rgba(0,0,0,.12);
+}
+
+.header{
+  padding:18px 26px;
+  border-bottom:1px solid var(--border);
+}
+
+.chat{
+  flex:1;
+  padding:28px;
+  overflow-y:auto;
+}
+
+.msg{
+  max-width:72%;
+  padding:14px 18px;
+  border-radius:14px;
+  margin-bottom:12px;
+}
+
+.user{
+  margin-left:auto;
+  background:#e3f1f7;
+}
+
+.jarvis{
+  background:#ecfbff;
+  border:1px solid rgba(0,188,212,.35);
+}
+
+/* === MEMORY CONFIRMATION === */
+.memory{
+  align-self:center;
+  background:rgba(0,188,212,.12);
+  border:1px solid var(--cyan);
+  color:var(--cyan);
+  font-weight:600;
+  letter-spacing:.6px;
+  text-transform:uppercase;
+  box-shadow:0 0 14px rgba(0,188,212,.25);
+}
+
+.input-bar{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:16px 20px;
+  border-top:1px solid var(--border);
+}
+
+.input-bar input{
+  flex:1;
+  padding:14px 16px;
+  border-radius:14px;
+  border:1px solid var(--border);
+  outline:none;
+}
+
+/* ===== MIC + ORB ===== */
+
+.mic-wrap{
+  position:relative;
+  width:56px;
+  height:56px;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+}
+
+.mic-btn,.speaker-btn{
+  width:46px;
+  height:46px;
+  border-radius:50%;
+  border:none;
+  cursor:pointer;
+  background:radial-gradient(circle at top,#ffffff,#c7f4fb,#7bd6e3);
+  box-shadow:
+    inset 0 0 6px rgba(255,255,255,.9),
+    0 4px 16px rgba(0,188,212,.45);
+}
+
+.speaker-btn.off{
+  opacity:.4;
+  box-shadow:none;
+}
+
+.mic-orb{
+  position:absolute;
+  bottom:64px;
+  left:50%;
+  transform:translateX(-50%) scale(.6);
+  width:30px;
+  height:30px;
+  border-radius:50%;
+  background:radial-gradient(circle,
+    rgba(0,188,212,1) 0%,
+    rgba(0,188,212,.7) 45%,
+    rgba(0,188,212,.2) 70%,
+    rgba(0,188,212,0) 100%);
+  opacity:0;
+  box-shadow:
+    0 0 18px rgba(0,188,212,.8),
+    0 0 40px rgba(0,188,212,.6);
+  transition:opacity .2s ease;
+}
+
+.mic-orb.active{opacity:1;}
+
+.send-btn{
+  height:46px;
+  padding:0 20px;
+  border-radius:12px;
+  border:none;
+  background:var(--cyan);
+  color:white;
+  font-weight:600;
+  cursor:pointer;
+}
+</style>
+</head>
+
+<body>
+<div class="frame">
+  <div class="header">
+    <div style="font-weight:600">J.A.R.V.I.S</div>
+    <div style="font-size:12px;color:var(--muted)">Voice + Text</div>
+  </div>
+
+  <div class="chat" id="chat"></div>
+
+  <div class="input-bar">
+    <input id="input" placeholder="Type or speak">
+
+    <div class="mic-wrap">
+      <div class="mic-orb" id="micOrb"></div>
+      <button class="mic-btn" id="micBtn">🎤</button>
+    </div>
+
+    <button class="speaker-btn" id="speakerBtn">🔊</button>
+    <button class="send-btn" onclick="send()">SEND</button>
+  </div>
+</div>
+
+<script>
+const chat=document.getElementById("chat");
+const input=document.getElementById("input");
+const micBtn=document.getElementById("micBtn");
+const micOrb=document.getElementById("micOrb");
+const speakerBtn=document.getElementById("speakerBtn");
+const socket=io();
+
+/* ===== CHAT ===== */
+function add(text, cls){
+  const d=document.createElement("div");
+
+  if(text && text.toLowerCase()==="updated memory!"){
+    d.className="msg memory";
+    d.textContent="UPDATED MEMORY";
+  }else{
+    d.className="msg "+cls;
+    d.textContent=text;
+  }
+
+  chat.appendChild(d);
+  chat.scrollTop=chat.scrollHeight;
+}
+
+socket.on("connect",()=>add("Connected.","jarvis"));
+socket.on("llm_token",d=>add(d.token,"jarvis"));
+
+/* ===== SPEAKER ===== */
+let speakerOn=true;
+speakerBtn.onclick=()=>{
+  speakerOn=!speakerOn;
+  speakerBtn.classList.toggle("off",!speakerOn);
+  speakerBtn.textContent=speakerOn?"🔊":"🔇";
+};
+
+let audioQueue=[],playing=false;
+socket.on("audio_chunk",d=>{
+  if(!speakerOn) return;
+  const a=new Audio("data:audio/mp3;base64,"+d.audio_b64);
+  audioQueue.push(a);
+  playNext();
+});
+function playNext(){
+  if(playing||audioQueue.length===0) return;
+  playing=true;
+  const a=audioQueue.shift();
+  a.onended=()=>{playing=false;playNext()};
+  a.play();
+}
+
+function send(){
+  const t=input.value.trim();
+  if(!t) return;
+  input.value="";
+  add(t,"user");
+  socket.emit("start_stream",{message:t});
+}
+
+/* ===== MIC ===== */
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+let rec,micEnabled=false,isStopping=false,mediaStream=null;
+let audioCtx,analyser,dataArray,animating=false;
+
+function startOrbAnimation(stream){
+  audioCtx=new AudioContext();
+  analyser=audioCtx.createAnalyser();
+  analyser.fftSize=256;
+  const src=audioCtx.createMediaStreamSource(stream);
+  src.connect(analyser);
+  dataArray=new Uint8Array(analyser.frequencyBinCount);
+  animating=true;
+  animateOrb();
+}
+function stopOrbAnimation(){
+  animating=false;
+  micOrb.style.transform="translateX(-50%) scale(.6)";
+}
+function animateOrb(){
+  if(!animating) return;
+  analyser.getByteFrequencyData(dataArray);
+  let avg=dataArray.reduce((a,b)=>a+b)/dataArray.length;
+  let scale=.6+Math.min(avg/120,1.4);
+  micOrb.style.transform=`translateX(-50%) scale(${scale})`;
+  requestAnimationFrame(animateOrb);
+}
+
+if(SR){
+  rec=new SR();
+  rec.lang="en-IN";
+  rec.onstart=()=>micOrb.classList.add("active");
+  rec.onend=()=>{
+    if(micEnabled&&!isStopping) rec.start();
+    else{micOrb.classList.remove("active");stopOrbAnimation();}
+  };
+  rec.onresult=e=>{
+    const t=e.results[0][0].transcript.trim();
+    if(t){add(t,"user");socket.emit("start_stream",{message:t});}
+  };
+  micBtn.onclick=async()=>{
+    if(!micEnabled){
+      micEnabled=true;isStopping=false;
+      mediaStream=await navigator.mediaDevices.getUserMedia({audio:true});
+      startOrbAnimation(mediaStream);
+      rec.start();
+    }else{
+      micEnabled=false;isStopping=true;
+      rec.stop();
+      if(mediaStream){mediaStream.getTracks().forEach(t=>t.stop());mediaStream=null;}
+      micOrb.classList.remove("active");
+      stopOrbAnimation();
+    }
+  };
+}else micBtn.disabled=true;
+
+input.addEventListener("keydown",e=>{if(e.key==="Enter")send()});
+</script>
+</body>
+</html>
